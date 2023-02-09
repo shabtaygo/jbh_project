@@ -1,8 +1,3 @@
-
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <ctype.h>
 #include "customers_db.h"
 // valgrind --leak-check=yes
 void free_db(Customer *head)
@@ -12,28 +7,6 @@ void free_db(Customer *head)
         Customer *temp = head->next;
         free(head);
         head = temp;
-    }
-}
-
-void show(Customer *head)
-{
-    if (!head)
-    {
-        puts("No customers");
-        return;
-    }
-    else
-    {
-        printf("%-15s%-15s%-15s%-15s%-15s%-15s\n",
-               "First Name", "Last Name", "ID", "Phone", "Debt", "Date");
-        puts("=================================================================================");
-    }
-
-    while (head)
-    {
-        printf("%-15s%-15s%-15s%-15s%-15s%-15.2f\n", head->first_name, head->last_name,
-               head->id, head->phone, head->date, head->debt);
-        head = head->next;
     }
 }
 
@@ -60,13 +33,16 @@ Customer *find_by_id(Customer **pHead, Customer *customer)
     }
 }
 
-void insert_record(char *fname, Customer *customer)
+void insert_record(char *fname, Customer *customer,
+                   void (*show)(char *, int), int mode)
 {
+    char message[40] = {0};
     int write = 0;
     FILE *f = fopen(fname, "a");
     if (!f)
     {
-        printf("Error opening file\n");
+        sprintf(message, "Error opening %s file\n", fname);
+        show(message, mode);
         return;
     }
     write = fprintf(f, "\n%s,%s,%s,%s,%s,%.2f",
@@ -76,11 +52,12 @@ void insert_record(char *fname, Customer *customer)
                     customer->phone,
                     customer->date,
                     customer->debt);
-    write < 0 ? printf("wrong inseration\n") : printf("SUCCESS");
+    write < 0 ? show("wrong inseration\n", mode) : show("SUCCESS\n", mode);
     fclose(f);
 }
 
-void insert_customer(Customer **pHead, Customer *customer)
+void insert_customer(Customer **pHead, Customer *customer,
+                     void (*show)(char *, int), int mode)
 {
     Customer **pNext = pHead;
     Customer *new = find_by_id(pHead, customer);
@@ -89,12 +66,12 @@ void insert_customer(Customer **pHead, Customer *customer)
     {
         pNext = &((*pNext)->next);
     }
-
     if (!new)
     {
         new = malloc(sizeof(Customer));
         if (!new)
         {
+            show("Memory not allocated.\n", mode);
             return;
         }
         strcpy(new->first_name, customer->first_name);
@@ -108,15 +85,16 @@ void insert_customer(Customer **pHead, Customer *customer)
     *pNext = new;
 }
 
-void read_date(char *fname, Customer **pHead)
+void read_date(char *fname, Customer **pHead,
+               void (*show)(char *, int), int mode)
 {
-    char buffr[200];
+    char buffr[200], message[30] = {0};
     unsigned read = 0, i = 0;
     Customer customer = {};
     FILE *f = fopen(fname, "r");
     if (!f)
     {
-        printf("Error opening file\n");
+        show("Error opening file\n", mode);
         return;
     }
     while (!feof(f))
@@ -132,47 +110,25 @@ void read_date(char *fname, Customer **pHead)
         if (read == 6)
         {
             i++;
-            insert_customer(pHead, &customer);
+            insert_customer(pHead, &customer, show, mode);
         }
         else
         {
-            printf("line %u uncorrect", i++);
+            sprintf(message, "record %u is incorrect\n", i++);
+            show(message, mode);
         }
     }
     fclose(f);
-    show(*pHead);
 };
 
-void insertTail(Customer **pTail, Customer *customer)
+void compare_fname(const Customer *db, char *fname, int op,
+                   void (*show)(char *, int), int mode)
 {
-    Customer *new = malloc(sizeof(Customer));
-
-    if (!new)
-    {
-        return;
-    }
-    strcpy(new->first_name, customer->first_name);
-    strcpy(new->last_name, customer->last_name);
-    strcpy(new->id, customer->id);
-    strcpy(new->phone, customer->phone);
-    new->debt = customer->debt;
-    strcpy(new->date, customer->date);
-    new->next = NULL;
-    if (*pTail)
-    {
-        (*pTail)->next = new;
-    }
-    *pTail = new;
-}
-
-void compare_fname(Customer *db, char *fname, int op)
-{
-    Customer *head = NULL, *tail = NULL, *customer = db;
-
-    while (customer)
+    char message[200] = {0};
+    while (db)
     {
         unsigned match = 0;
-        int res = strcmp(customer->first_name, fname);
+        int res = strcmp(db->first_name, fname);
         switch (op)
         {
         case 0:
@@ -190,26 +146,23 @@ void compare_fname(Customer *db, char *fname, int op)
         }
         if (match)
         {
-            insertTail(&tail, customer);
-            if (!head)
-            {
-                head = tail;
-            }
+            memset(message, 0, sizeof(message));
+            sprintf(message, "%-15s%-15s%-15s%-15s%-15s%-15.2f\n",
+                    db->first_name, db->last_name,
+                    db->id, db->phone, db->date, db->debt);
+            show(message, mode);
         }
-        customer = customer->next;
+        db = db->next;
     }
-    show(head);
-    free_db(head);
 };
-
-void compare_lname(Customer *db, char *lname, int op)
+void compare_lname(const Customer *db, char *lname, int op,
+                   void (*show)(char *, int), int mode)
 {
-    Customer *head = NULL, *tail = NULL, *customer = db;
-
-    while (customer)
+    char message[200] = {0};
+    while (db)
     {
         unsigned match = 0;
-        int res = strcmp(customer->last_name, lname);
+        int res = strcmp(db->last_name, lname);
         switch (op)
         {
         case 0:
@@ -227,26 +180,24 @@ void compare_lname(Customer *db, char *lname, int op)
         }
         if (match)
         {
-            insertTail(&tail, customer);
-            if (!head)
-            {
-                head = tail;
-            }
+            memset(message, 0, sizeof(message));
+            sprintf(message, "%-15s%-15s%-15s%-15s%-15s%-15.2f\n",
+                    db->first_name, db->last_name,
+                    db->id, db->phone, db->date, db->debt);
+            show(message, mode);
         }
-        customer = customer->next;
+        db = db->next;
     }
-    show(head);
-    free_db(head);
 };
 
-void compare_id(Customer *db, char *id, int op)
+void compare_id(const Customer *db, char *id, int op,
+                void (*show)(char *, int), int mode)
 {
-    Customer *head = NULL, *tail = NULL, *customer = db;
-
-    while (customer)
+    char message[200] = {0};
+    while (db)
     {
         unsigned match = 0;
-        int res = strcmp(customer->id, id);
+        int res = strcmp(db->id, id);
         switch (op)
         {
         case 0:
@@ -264,26 +215,24 @@ void compare_id(Customer *db, char *id, int op)
         }
         if (match)
         {
-            insertTail(&tail, customer);
-            if (!head)
-            {
-                head = tail;
-            }
+            memset(message, 0, sizeof(message));
+            sprintf(message, "%-15s%-15s%-15s%-15s%-15s%-15.2f\n",
+                    db->first_name, db->last_name,
+                    db->id, db->phone, db->date, db->debt);
+            show(message, mode);
         }
-        customer = customer->next;
+        db = db->next;
     }
-    show(head);
-    free_db(head);
 };
 
-void compare_phone(Customer *db, char *phone, int op)
+void compare_phone(const Customer *db, char *phone, int op,
+                   void (*show)(char *, int), int mode)
 {
-    Customer *head = NULL, *tail = NULL, *customer = db;
-
-    while (customer)
+    char message[200] = {0};
+    while (db)
     {
         unsigned match = 0;
-        int res = strcmp(customer->phone, phone);
+        int res = strcmp(db->phone, phone);
         switch (op)
         {
         case 0:
@@ -301,16 +250,14 @@ void compare_phone(Customer *db, char *phone, int op)
         }
         if (match)
         {
-            insertTail(&tail, customer);
-            if (!head)
-            {
-                head = tail;
-            }
+            memset(message, 0, sizeof(message));
+            sprintf(message, "%-15s%-15s%-15s%-15s%-15s%-15.2f\n",
+                    db->first_name, db->last_name,
+                    db->id, db->phone, db->date, db->debt);
+            show(message, mode);
         }
-        customer = customer->next;
+        db = db->next;
     }
-    show(head);
-    free_db(head);
 };
 
 int compare_int(int a, int b)
@@ -318,16 +265,16 @@ int compare_int(int a, int b)
     return a - b;
 }
 
-void compare_date(Customer *db, char *date, int op)
+void compare_date(const Customer *db, char *date, int op,
+                  void (*show)(char *, int), int mode)
 {
-    Customer *head = NULL, *tail = NULL, *customer = db;
+    char message[200] = {0};
     unsigned days = atol(strtok(date, "/"));
     unsigned month = atoi(strtok(NULL, "/"));
     unsigned years = atoi(strtok(NULL, "'\0'"));
-
-    while (customer)
+    while (db)
     {
-        char *date_cus = strdup(customer->date);
+        char *date_cus = strdup(db->date);
         unsigned match = 0;
         unsigned day_cus = atol(strtok(date_cus, "/"));
         unsigned month_cus = atoi(strtok(NULL, "/"));
@@ -341,7 +288,6 @@ void compare_date(Customer *db, char *date, int op)
                 res = compare_int(day_cus, days);
             }
         }
-
         switch (op)
         {
         case 0:
@@ -359,27 +305,26 @@ void compare_date(Customer *db, char *date, int op)
         }
         if (match)
         {
-            insertTail(&tail, customer);
-            if (!head)
-            {
-                head = tail;
-            }
+            memset(message, 0, sizeof(message));
+            sprintf(message, "%-15s%-15s%-15s%-15s%-15s%-15.2f\n",
+                    db->first_name, db->last_name,
+                    db->id, db->phone, db->date, db->debt);
+            show(message, mode);
         }
-        customer = customer->next;
+        db = db->next;
         free(date_cus);
     }
-    show(head);
-    free_db(head);
 };
 
-void compare_debt(Customer *db, char *debtc, int op)
+void compare_debt(const Customer *db, char *debtc, int op,
+                  void (*show)(char *, int), int mode)
 {
-    Customer *head = NULL, *tail = NULL, *customer = db;
+    char message[200] = {0};
     float debt = atof(debtc);
-    while (customer)
+    while (db)
     {
         unsigned match = 0;
-        int res = debt - customer->debt;
+        int res = debt - db->debt;
         switch (op)
         {
         case 0:
@@ -397,23 +342,21 @@ void compare_debt(Customer *db, char *debtc, int op)
         }
         if (match)
         {
-            insertTail(&tail, customer);
-            if (!head)
-            {
-                head = tail;
-            }
+            memset(message, 0, sizeof(message));
+            sprintf(message, "%-15s%-15s%-15s%-15s%-15s%-15.2f\n",
+                    db->first_name, db->last_name,
+                    db->id, db->phone, db->date, db->debt);
+            show(message, mode);
         }
-        customer = customer->next;
+        db = db->next;
     }
-    show(head);
-    free_db(head);
 };
 
-void to_lower(char* str)
+void to_lower(char *str)
 {
-    unsigned len=strlen(str);
+    unsigned len = strlen(str);
     for (size_t i = 0; i < len; i++)
     {
-        str[i]=tolower(str[i]);
+        str[i] = tolower(str[i]);
     }
 }
