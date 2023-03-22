@@ -21,6 +21,7 @@ void handl_show(Customer *head, void (*show)(char *, int), int mode)
             sprintf(message, "%-15s%-15s%-15s%-15s%-15s%-15.2f\n", head->first_name, head->last_name,
                     head->id, head->phone, head->date, head->debt);
             show(message, mode);
+            printf("handl_show mode=%d\n", mode);
             head = head->next;
         }
     }
@@ -139,9 +140,10 @@ void handl_query(char *command, Customer **pHead, char *file_name,
 {
     char str[10] = {0};
     sscanf(command, "%s", str);
+    printf("command=%s\n", str);
     if (!strcmp(str, "show"))
     {
-        handl_show(*pHead, show, 0);
+        handl_show(*pHead, show, mode);
         return;
     }
     if (!strcmp(str, "select"))
